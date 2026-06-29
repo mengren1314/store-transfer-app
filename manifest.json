@@ -1,6 +1,6 @@
 {
-  "name": "门店调拨 - 离线版",
-  "short_name": "门店调拨",
+  "name": "门店调拨扫码工具",
+  "short_name": "调拨扫码",
   "description": "门店调拨扫码工具，纯本地运行，无需网络",
   "start_url": "index.html",
   "display": "standalone",
