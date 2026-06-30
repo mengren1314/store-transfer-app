@@ -257,6 +257,7 @@
   <script src="quagga.min.js"></script>
   <script src="xlsx.core.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 </head>
 <body>
 <div class="phone-frame">
@@ -678,8 +679,14 @@
     if (!encrypted) return;
     try {
       const bytes = CryptoJS.AES.decrypt(encrypted, SECRET_KEY);
-      const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-      if (!decrypted) return;
+      const compressedB64 = bytes.toString(CryptoJS.enc.Utf8);
+      if (!compressedB64) return;
+      // Base64 → Uint8Array → 解压
+      const binStr = atob(compressedB64);
+      const u8arr = new Uint8Array(binStr.length);
+      for (let i = 0; i < binStr.length; i++) { u8arr[i] = binStr.charCodeAt(i); }
+      const decompressed = pako.inflate(u8arr);
+      const decrypted = new TextDecoder().decode(decompressed);
       const data = JSON.parse(decrypted);
       if (data && data.items && data.items.length) {
         remoteProductMap = new Map();
