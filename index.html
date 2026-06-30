@@ -317,6 +317,21 @@
     <!-- ② 扫码图标 + 手动输入（填写基本信息后显示） -->
     <div id="scanSectionContent" class="hidden">
 
+    <!-- 📊 导入商品库 -->
+    <div class="card" style="padding:10px 14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <span style="font-size:13px;font-weight:600;color:#374151;">📊 商品库</span>
+          <span id="productCountBadge" style="font-size:11px;color:#9CA3AF;margin-left:6px;"></span>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button id="btnClearFromScan" class="btn btn-sm btn-outline" style="gap:4px;color:#EF4444;border-color:#EF4444;font-size:12px;padding:6px 10px;width:auto;">🗑 清空</button>
+          <button id="btnImportFromScan" class="btn btn-sm btn-outline" style="gap:4px;color:#059669;border-color:#059669;font-size:12px;padding:6px 14px;width:auto;">📥 导入</button>
+        </div>
+      </div>
+      <div id="emptyProductHint" style="display:none;font-size:12px;color:#9CA3AF;margin-top:6px;padding-top:6px;border-top:1px solid #F3F4F6;">💡 暂无商品，请先导入 Excel 商品信息</div>
+    </div>
+
     <!-- 📦 箱管理 -->
     <div class="card" id="boxManager">
       <div class="flex-between mb-2">
@@ -334,8 +349,6 @@
         <span id="boxTotalSummary">共 1 箱</span>
       </div>
     </div>
-
-
 
     <!-- ② 扫码图标 -->
     <div class="card" style="padding:8px 16px;">
@@ -372,8 +385,8 @@
     <div class="card">
       <div style="font-size:13px;font-weight:600;color:#6B7280;margin-bottom:8px;">⌨️ 手动输入条码</div>
       <div class="flex-row gap-2">
-        <input id="manualBarcode" class="input" placeholder="输入条码后点匹配" style="flex:1;" />
-        <button id="btnManualMatch" class="btn btn-sm" style="width:auto;flex-shrink:0;padding:10px 16px;">匹配</button>
+        <input id="manualBarcode" class="input" placeholder="输入条码后点查找" style="flex:1;" />
+        <button id="btnManualMatch" class="btn btn-sm" style="width:auto;flex-shrink:0;padding:10px 16px;">查找</button>
       </div>
     </div>
 
@@ -419,22 +432,14 @@
     <div id="recordsList"></div>
   </div>
 
-  <!-- ===== 商品库页 ===== -->
-  <div id="sectionProducts" class="section">
-    <div class="flex-between mb-2">
-      <div style="font-size:15px;font-weight:700;color:#374151;">📦 商品库</div>
-      <div class="flex-row gap-1">
-        <button id="btnImportExcel" class="btn btn-sm btn-outline" style="gap:4px;color:#059669;border-color:#059669;">📊 导入</button>
-        <button id="btnAddProduct" class="btn btn-sm" style="width:auto;gap:4px;">+ 添加</button>
-        <button id="btnClearProducts" class="btn btn-sm btn-outline" style="gap:4px;color:#EF4444;border-color:#EF4444;">🗑 清空</button>
-      </div>
-    </div>
-    <div class="search-box">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input id="inputSearchProduct" placeholder="搜索商品名称或条码..." />
-      <span id="productCount" style="font-size:12px;color:#9CA3AF;"></span>
-    </div>
-    <div id="productsList" class="card" style="padding:0 16px;"></div>
+  <!-- ===== 商品库（已隐藏，仅保留导入功能入口） ===== -->
+  <div id="sectionProducts" style="display:none;">
+    <button id="btnImportExcel" style="display:none;">📊 导入</button>
+    <button id="btnAddProduct" style="display:none;"></button>
+    <button id="btnClearProducts" style="display:none;"></button>
+    <input id="inputSearchProduct" style="display:none;" />
+    <span id="productCount" style="display:none;"></span>
+    <div id="productsList" style="display:none;"></div>
   </div>
 </div>
 
@@ -450,11 +455,7 @@
     <span>记录</span>
     <div class="tab-line"></div>
   </button>
-  <button id="tabProducts" data-section="sectionProducts">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-    <span>商品库</span>
-    <div class="tab-line"></div>
-  </button>
+
 </div>
 
 <!-- ===== 全屏相机覆盖层 ===== -->
@@ -509,6 +510,7 @@
     </div>
     <div class="mb-2"><label>条码</label><input id="recModalBarcode" class="input" placeholder="修改条码后自动匹配" /></div>
     <div class="mb-2"><label>商品名称</label><div id="recModalName" class="input" style="background:#F3F4F6;color:#374151;display:flex;align-items:center;height:42px;font-weight:600;">-</div></div>
+    <div class="mb-2"><label>商品编码</label><div id="recModalCode" class="input" style="background:#F3F4F6;color:#9CA3AF;display:flex;align-items:center;height:42px;font-size:13px;">-</div></div>
     <div class="grid-2 mb-2">
       <div><label>数量</label><input id="recModalQty" type="number" min="1" step="1" class="input" /></div>
       <div><label>箱号</label><input id="recModalBox" type="number" min="1" step="1" class="input" value="1" /></div>
@@ -540,6 +542,7 @@
   <div class="modal-box">
     <div class="flex-between mb-3">
       <span style="font-size:17px;font-weight:700;">📋 调拨基本信息</span>
+      <button class="modalClose" data-modal="infoModal" style="background:none;border:none;font-size:22px;color:#9CA3AF;cursor:pointer;">✕</button>
     </div>
     <div class="mb-2"><label>调拨单号 *</label><input id="infoOrderNo" class="input" placeholder="如：DB20240601-001" /></div>
     <div class="grid-2 mb-2">
@@ -977,6 +980,10 @@
     const q = (filter || document.getElementById('inputSearchProduct').value || '').toLowerCase().trim();
     let list = q ? products.filter(p => p.name.toLowerCase().includes(q) || p.barcode.includes(q)) : products;
     document.getElementById('productCount').textContent = list.length + ' 项';
+    const badge = document.getElementById('productCountBadge');
+    if (badge) badge.textContent = products.length + ' 个商品';
+    const hint = document.getElementById('emptyProductHint');
+    if (hint) hint.style.display = products.length === 0 ? 'block' : 'none';
     if (list.length === 0) {
       container.innerHTML = '<div class="empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>' +
         (products.length === 0 ? '<p>暂无商品，点击"添加"按钮</p>' : '<p>未找到匹配的商品</p>') + '</div>';
@@ -1045,7 +1052,9 @@
         records.forEach(r => {
           html += '<div class="record-item" data-id="'+r.id+'" style="cursor:pointer;border-left-color:#9CA3AF;padding:6px 10px;margin-bottom:2px;">';
           html += '<div class="flex-between"><span style="font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(r.productName||'未知商品')+'</span><span style="font-size:14px;font-weight:700;color:#4F46E5;">×'+r.quantity+'</span></div>';
-          html += '<div class="text-xs text-gray2 font-mono" style="margin-top:1px;">'+esc(r.barcode)+'</div>';
+          // 记录列表显示编码，未保存时从商品库自动补全
+    const rCode = r.productCode || (products.find(p => p.barcode === r.barcode) || {}).code || '';
+    html += '<div class="text-xs text-gray2 font-mono" style="margin-top:1px;">'+esc(r.barcode)+(rCode ? ' <span style="color:#9CA3AF;">编码 '+esc(rCode)+'</span>' : '')+'</div>';
           html += '</div>';
         });
         html += '</div>';
@@ -1068,6 +1077,9 @@
     const modal = document.getElementById('recordModal');
     document.getElementById('recModalBarcode').value = rec.barcode || '';
     document.getElementById('recModalName').textContent = rec.productName || '-';
+    // 弹窗中显示商品编码，未保存时从商品库自动补全
+    const recCode = rec.productCode || (products.find(p => p.barcode === rec.barcode) || {}).code || '';
+    document.getElementById('recModalCode').textContent = recCode || '-';
     document.getElementById('recModalQty').value = rec.quantity || '';
     document.getElementById('recModalBox').value = rec.boxNo || 1;
     document.getElementById('recModalId').value = rec.id;
@@ -1149,7 +1161,7 @@
       if (!groups[key]) groups[key] = [];
       groups[key].push(r);
     });
-    const h = ['门店调拨单号','货源门店','目标门店','创建时间','调拨类型','门店入库单号','备注','商品条形码','商品名称','实调数量','总计','仓库','箱号'];
+    const h = ['门店调拨单号','货源门店','目标门店','创建时间','调拨类型','门店入库单号','备注','商品编码','商品条形码','商品名称','实调数量','总计','仓库','箱号'];
     const exportTime = nowStr();
     const sheetData = [h];
     const merges = [];
@@ -1179,6 +1191,7 @@
           row.push(''); row.push(''); row.push(''); row.push(''); row.push(''); row.push(''); row.push('');
         }
         // 商品明细每行独立
+        row.push(r.productCode || '');
         row.push(r.barcode || '');
         row.push(r.productName || '');
         row.push(parseInt(r.quantity) || 0);
@@ -1190,7 +1203,7 @@
         const boxNo = r.boxNo || 1;
         if (boxNo !== lastBoxNo) {
           if (lastBoxNo !== -1 && globalRow - 1 > boxStartRow) {
-            merges.push({s:{r:boxStartRow,c:12}, e:{r:globalRow-1,c:12}});
+            merges.push({s:{r:boxStartRow,c:13}, e:{r:globalRow-1,c:13}});
           }
           row.push('第'+boxNo+'箱');
           lastBoxNo = boxNo;
@@ -1203,13 +1216,13 @@
       });
       // 合并当前组的箱号尾段
       if (globalRow - 1 > boxStartRow) {
-        merges.push({s:{r:boxStartRow,c:12}, e:{r:globalRow-1,c:12}});
+        merges.push({s:{r:boxStartRow,c:13}, e:{r:globalRow-1,c:13}});
       }
       // 合并单据级字段：A-G 列 + K 列（总计）
       const endRow = globalRow - 1;
       if (endRow > startRow) {
         for (let c = 0; c <= 6; c++) merges.push({s:{r:startRow,c}, e:{r:endRow,c}});
-        merges.push({s:{r:startRow,c:10}, e:{r:endRow,c:10}}); // 总计 K 列
+        merges.push({s:{r:startRow,c:11}, e:{r:endRow,c:11}}); // 总计 L 列
       }
     });
     const csvHeader = h.join(',');
@@ -1222,7 +1235,7 @@
         csvRows.push([
           orderNo, first.fromStore||'', first.toStore||'', exportTime,
           first.transferType||'调拨出库', first.inboundNo||'', first.note||'',
-          r.barcode||'', r.productName||'', parseInt(r.quantity)||0,
+          r.productCode||'', r.barcode||'', r.productName||'', parseInt(r.quantity)||0,
           totalQty, (first.fromStore||'')+'正常仓', '第'+(r.boxNo||1)+'箱'
         ].map(v => '"'+String(v).replace(/"/g,'""')+'"').join(','));
       });
@@ -1246,7 +1259,7 @@
   // 【下载】直接下载文件到本地
   function downloadCSVWithData(dataList, filename) {
     if (dataList.length === 0) { toast('暂无记录可下载', 'error'); return; }
-    const h = ['门店调拨单号','货源门店','目标门店','创建时间','调拨类型','门店入库单号','备注','商品条形码','商品名称','实调数量','总计','仓库','箱号'];
+    const h = ['门店调拨单号','货源门店','目标门店','创建时间','调拨类型','门店入库单号','备注','商品编码','商品条形码','商品名称','实调数量','总计','仓库','箱号'];
     const exportTime = nowStr();
     const csvRows = [];
     const groups = {};
@@ -1265,7 +1278,7 @@
         csvRows.push([
           orderNo, first.fromStore||'', first.toStore||'', exportTime,
           first.transferType||'调拨出库', first.inboundNo||'', first.note||'',
-          r.barcode||'', r.productName||'', parseInt(r.quantity)||0,
+          r.productCode||'', r.barcode||'', r.productName||'', parseInt(r.quantity)||0,
           totalQty, (first.fromStore||'')+'正常仓', '第'+(r.boxNo||1)+'箱'
         ].map(v => '"'+String(v).replace(/"/g,'""')+'"').join(','));
       });
@@ -1340,11 +1353,15 @@
     b.addEventListener('click', () => switchTab(b.dataset.section));
   });
 
-  // 扫码图标点击
+  // 扫码图标点击 - 未填写基本信息时弹出填写弹窗
   document.getElementById('btnOpenScanner').addEventListener('click', () => {
-    const btn = document.getElementById('btnOpenScanner');
-    if (btn.classList.contains('disabled')) {
-      toast('请先填写完整的基本信息', '');
+    const orderNo = document.getElementById('inputOrderNo').value.trim();
+    const fromStore = document.getElementById('inputFromStore').value.trim();
+    const toStore = document.getElementById('inputToStore').value.trim();
+    const transferType = document.getElementById('inputTransferType').value;
+    if (!orderNo || !fromStore || !toStore || !transferType) {
+      document.getElementById('infoModal').classList.add('open');
+      document.getElementById('infoOrderNo').focus();
       return;
     }
     openScanner();
@@ -1371,7 +1388,7 @@
     document.getElementById('inputQuantity').value = '';
   });
 
-  // 输入数量后自动确认
+  // 输入数量后自动确认（同单号+同箱号+同条码自动叠加数量）
   let quantityTimer = null;
   function doConfirm() {
     if (!currentScan) return;
@@ -1391,26 +1408,41 @@
       document.getElementById('scanResult').classList.add('hidden');
       return;
     }
-    transfers.unshift({
-      id: uid(),
-      orderNo: document.getElementById('inputOrderNo').value.trim(),
-      boxNo: currentBoxNo,
-      barcode: currentScan.barcode,
-      productName: currentScan.product ? currentScan.product.name : '未查到商品信息',
-      quantity: qty,
-      unit: (currentScan.product && currentScan.product.unit) || '个',
-      fromStore: document.getElementById('inputFromStore').value.trim(),
-      toStore: document.getElementById('inputToStore').value.trim(),
-      inboundNo: document.getElementById('inputInboundNo').value.trim(),
-      transferType: document.getElementById('inputTransferType').value,
-      note: document.getElementById('inputNote').value.trim(),
-      timestamp: new Date().toISOString()
-    });
+    const orderNo = document.getElementById('inputOrderNo').value.trim();
+    const barcode = currentScan.barcode;
+    const productName = currentScan.product ? currentScan.product.name : '未查到商品信息';
+    // 查找同单号+同箱号+同条码的已有记录 → 叠加数量
+    const existing = transfers.find(t => t.orderNo === orderNo && t.boxNo === currentBoxNo && t.barcode === barcode);
+    let totalQty;
+    if (existing) {
+      existing.quantity = (parseInt(existing.quantity) || 0) + qty;
+      existing.timestamp = new Date().toISOString();
+      totalQty = existing.quantity;
+    } else {
+      transfers.unshift({
+        id: uid(),
+        orderNo: orderNo,
+        boxNo: currentBoxNo,
+        barcode: barcode,
+        productName: productName,
+        productCode: (currentScan.product && currentScan.product.code) || '',
+        quantity: qty,
+        unit: (currentScan.product && currentScan.product.unit) || '个',
+        fromStore: document.getElementById('inputFromStore').value.trim(),
+        toStore: document.getElementById('inputToStore').value.trim(),
+        inboundNo: document.getElementById('inputInboundNo').value.trim(),
+        transferType: document.getElementById('inputTransferType').value,
+        note: document.getElementById('inputNote').value.trim(),
+        timestamp: new Date().toISOString()
+      });
+      totalQty = qty;
+    }
     saveTransfers();
     updateBoxUI();
-    addLatestRecord(currentScan.barcode, qty, currentBoxNo);
-    // 显示居中成功弹窗
-    document.getElementById('successMsg').innerHTML = currentScan.barcode + ' × ' + qty + '<br><span style="font-size:13px;color:#6B7280;">第 ' + currentBoxNo + ' 箱</span>';
+    addLatestRecord(barcode, qty, currentBoxNo);
+    // 显示居中成功弹窗（叠加时显示合计数量）
+    const displayTotal = existing ? '（累计 ' + totalQty + ' 件）' : '';
+    document.getElementById('successMsg').innerHTML = productName + ' × +' + qty + displayTotal + '<br><span style="font-size:13px;color:#6B7280;">第 ' + currentBoxNo + ' 箱</span>';
     document.getElementById('successPopup').classList.add('open');
     setTimeout(() => document.getElementById('successPopup').classList.remove('open'), 1500);
     currentScan = null;
@@ -1601,6 +1633,15 @@
 
   document.getElementById('btnAddProduct').addEventListener('click', () => openProductModal(null));
 
+  // 扫码页导入按钮 → 触发隐藏的商品库导入
+  document.getElementById('btnImportFromScan').addEventListener('click', () => {
+    document.getElementById('btnImportExcel').click();
+  });
+  // 扫码页清空按钮 → 触发隐藏的商品库清空
+  document.getElementById('btnClearFromScan').addEventListener('click', () => {
+    document.getElementById('btnClearProducts').click();
+  });
+
   // 导入 Excel 表格
   document.getElementById('btnImportExcel').addEventListener('click', () => {
     const input = document.createElement('input');
@@ -1622,6 +1663,7 @@
 	          if (bIdx < 0) bIdx = headers.findIndex(h => h.includes('商品编码') && !h.includes('关联'));
           let nIdx = headers.findIndex(h => h.includes('商品名称'));
           if (nIdx < 0) nIdx = headers.findIndex(h => h.includes('名称'));
+          let cIdx = headers.findIndex(h => h.includes('商品编码') && !h.includes('关联'));
           let uIdx = headers.findIndex(h => h.includes('基本单位') || h.includes('单位'));
 
           if (bIdx < 0 || nIdx < 0) { toast('未找到"条形码"和"商品名称"列', 'error'); return; }
@@ -1643,7 +1685,8 @@
               if (/ZB$/i.test(bc)) { filterZb++; continue; }
               if (products.some(p => p.barcode === bc)) { skipped++; continue; }
               const unitVal = uIdx >= 0 && row[uIdx] ? String(row[uIdx]).trim() || '个' : '个';
-              products.push({ barcode: bc, name, unit: unitVal, spec: '', createdAt: new Date().toISOString() });
+              const codeVal = cIdx >= 0 && row[cIdx] ? String(row[cIdx]).trim() : '';
+              products.push({ barcode: bc, name, code: codeVal, unit: unitVal, spec: '', createdAt: new Date().toISOString() });
               added++;
             }
           }
@@ -1663,6 +1706,7 @@
   document.querySelectorAll('.modalClose').forEach(b => b.addEventListener('click', () => b.closest('.modal').classList.remove('open')));
   document.getElementById('productModal').addEventListener('click', e => { if (e.target === e.currentTarget) e.target.classList.remove('open'); });
   document.getElementById('recordModal').addEventListener('click', e => { if (e.target === e.currentTarget) e.target.classList.remove('open'); });
+  document.getElementById('infoModal').addEventListener('click', e => { if (e.target === e.currentTarget) e.target.classList.remove('open'); });
 
   // 保存记录
   document.getElementById('btnSaveRecord').addEventListener('click', () => {
@@ -1896,14 +1940,17 @@
     }
   });
 
-  // 自动弹出调拨基本信息弹窗
-  setTimeout(() => {
-    document.getElementById('infoModal').classList.add('open');
-    document.getElementById('infoOrderNo').focus();
-  }, 300);
-  // 初始检查基本信息状态
+  // 初始检查基本信息状态（不自动弹窗，等用户点击扫码时才弹）
   checkBasicInfo();
   updateBoxUI();
+  // 初始无数据时，直接显示编辑模式，方便用户填写
+  const initOrderNo = document.getElementById('inputOrderNo').value.trim();
+  if (!initOrderNo) {
+    document.getElementById('infoDisplay').classList.add('hidden');
+    document.getElementById('infoEdit').classList.remove('hidden');
+    document.getElementById('btnToggleEdit').style.display = 'none';
+    isEditingInfo = true;
+  }
 
 })();
 </script>
