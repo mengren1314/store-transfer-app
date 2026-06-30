@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>商品数据管理中心</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Noto Sans SC', -apple-system, sans-serif; }
+    body { background: #F3F4F6; }
+    .card { background: white; border-radius: 14px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
+    .tag { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .step-num { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+    .pulse { animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    #previewTable { max-height: 300px; overflow-y: auto; }
+    #previewTable table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    #previewTable th { background: #F9FAFB; position: sticky; top: 0; padding: 8px 10px; text-align: left; font-weight: 600; color: #6B7280; border-bottom: 2px solid #E5E7EB; }
+    #previewTable td { padding: 6px 10px; border-bottom: 1px solid #F3F4F6; }
+    #previewTable tr:hover td { background: #F9FAFB; }
+    .file-drop { border: 2px dashed #D1D5DB; border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.2s; }
+    .file-drop:hover { border-color: #4F46E5; background: #F5F3FF; }
+    .file-drop.dragover { border-color: #4F46E5; background: #EEF2FF; }
+  </style>
+</head>
+<body>
+
+<div class="max-w-3xl mx-auto px-4 py-6" id="app">
+  <!-- Header -->
+  <div class="flex items-center gap-3 mb-6">
+    <div style="width:40px;height:40px;background:#FFCE00;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;">🔐</div>
+    <div>
+      <h1 class="text-xl font-bold text-gray-800">商品数据管理中心</h1>
+      <p class="text-xs text-gray-400">管理员专用 · 发布脱敏商品数据到门店</p>
+    </div>
+  </div>
+
+  <!-- Password Gate -->
+  <div id="passwordGate" class="card mb-4">
+    <div class="flex items-center gap-3">
+      <i class="fas fa-lock text-gray-300 text-lg"></i>
+      <input id="pwdInput" type="password" class="flex-1 input border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-300" placeholder="输入管理密码" style="border-color:#D1D5DB;">
+      <button id="btnLogin" class="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition">进入</button>
+    </div>
+    <p id="pwdError" class="text-red-500 text-xs mt-2 hidden">❌ 密码错误</p>
+  </div>
+
+  <!-- Main Content (hidden until login) -->
+  <div id="mainContent" class="hidden space-y-4">
+
+    <!-- GitHub Config -->
+    <div class="card">
+      <div class="flex items-center gap-2 mb-3">
+        <i class="fab fa-github text-gray-500"></i>
+        <span class="font-semibold text-sm text-gray-700">GitHub 配置</span>
+        <span id="ghStatus" class="tag bg-gray-100 text-gray-400 text-xs ml-auto">未配置</span>
+      </div>
+      <div class="flex gap-2 items-center">
+        <input id="ghTokenInput" type="password" class="flex-1 border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-300 font-mono" placeholder="GitHub Token (ghp_...)" style="border-color:#D1D5DB;">
+        <button id="btnSaveToken" class="text-indigo-600 text-sm font-medium whitespace-nowrap hover:text-indigo-800 transition">保存</button>
+      </div>
+      <div class="text-xs text-gray-400 mt-1">仓库: CodeVoyage3/config-bootstrap · 文件: products.bin</div>
+    </div>
+
+    <!-- Step 1: Upload Excel -->
+    <div class="card">
+      <div class="flex items-center gap-2 mb-3">
+        <div class="step-num bg-indigo-100 text-indigo-600">1</div>
+        <span class="font-semibold text-sm text-gray-700">上传商品 Excel</span>
+        <span id="fileStatus" class="tag bg-gray-100 text-gray-400 text-xs ml-auto">未上传</span>
+      </div>
+      <div id="fileDropZone" class="file-drop">
+        <i class="fas fa-cloud-upload-alt text-3xl text-gray-300 mb-2"></i>
+        <p class="text-sm text-gray-500">点击选择或拖拽 Excel 文件到此处</p>
+        <p class="text-xs text-gray-400 mt-1">支持 .xlsx / .xls 格式</p>
+        <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden">
+      </div>
+      <div id="fileInfo" class="hidden mt-3">
+        <div class="flex items-center justify-between text-sm">
+          <span><span class="font-medium" id="fileName"></span> · 共 <span id="rowCount" class="font-bold text-indigo-600">0</span> 条数据</span>
+          <button id="btnClearFile" class="text-red-400 text-xs hover:text-red-600 transition">清除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Column Mapping & Preview -->
+    <div class="card" id="step2Card">
+      <div class="flex items-center gap-2 mb-3">
+        <div class="step-num bg-green-100 text-green-600">2</div>
+        <span class="font-semibold text-sm text-gray-700">确认数据映射</span>
+        <span class="tag bg-green-50 text-green-600 text-xs ml-auto">已脱敏</span>
+      </div>
+      <div class="grid grid-cols-3 gap-3 mb-3">
+        <div>
+          <label class="text-xs text-gray-500 font-medium block mb-1">条码列 *</label>
+          <select id="selectBarcodeCol" class="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-300" style="border-color:#D1D5DB;"></select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 font-medium block mb-1">商品名列 *</label>
+          <select id="selectNameCol" class="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-300" style="border-color:#D1D5DB;"></select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 font-medium block mb-1">商品编码列</label>
+          <select id="selectCodeCol" class="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-300" style="border-color:#D1D5DB;">
+            <option value="">（不选）</option>
+          </select>
+        </div>
+      </div>
+      <div id="previewTable">
+        <div class="text-center text-gray-400 text-sm py-8">请先上传 Excel 文件</div>
+      </div>
+      <div class="text-xs text-gray-400 mt-2 flex items-center gap-2">
+        <i class="fas fa-shield-alt text-green-500"></i>
+        保留条码、商品名称、商品编码 · 自动过滤 ZB 结尾条码 · 多条码自动拆分
+      </div>
+    </div>
+
+    <!-- Step 3: Publish -->
+    <div class="card">
+      <div class="flex items-center gap-2 mb-3">
+        <div class="step-num bg-amber-100 text-amber-600">3</div>
+        <span class="font-semibold text-sm text-gray-700">加密并发布到门店</span>
+        <span id="publishStatus" class="tag bg-gray-100 text-gray-400 text-xs ml-auto">待发布</span>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-3 text-sm">
+        <div>
+          <span class="text-gray-400 text-xs">加密算法</span>
+          <p class="font-medium text-gray-700">AES-256</p>
+        </div>
+        <div>
+          <span class="text-gray-400 text-xs">数据条数</span>
+          <p id="publishCount" class="font-medium text-gray-700">0 条</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 mb-3">
+        <input id="versionInput" class="flex-1 border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-300" placeholder="版本号（默认自动生成）" style="border-color:#D1D5DB;">
+      </div>
+      <button id="btnPublish" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+        <i class="fas fa-rocket"></i>
+        <span>🚀 加密并发布</span>
+      </button>
+      <div id="publishProgress" class="hidden mt-3">
+        <div class="flex items-center gap-2 text-sm text-indigo-600">
+          <i class="fas fa-spinner fa-spin"></i>
+          <span id="progressText">正在加密数据...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Publish History -->
+    <div class="card">
+      <div class="flex items-center gap-2 mb-3">
+        <i class="fas fa-history text-gray-400"></i>
+        <span class="font-semibold text-sm text-gray-700">发布记录</span>
+      </div>
+      <div id="historyList">
+        <p class="text-center text-gray-400 text-sm py-4">暂无发布记录</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function() {
+  const PWD = '131413';
+  const OWNER = 'CodeVoyage3';
+  const REPO = 'config-bootstrap';
+  const FILE_PATH = 'products.bin';
+  const SECRET_KEY = 'KkV_Tr@nsf3r#2026!';
+  const LS_TOKEN = 'mgmt_gh_token';
+  const LS_HISTORY = 'mgmt_publish_history';
+
+  // DOM refs
+  const $ = id => document.getElementById(id);
+  const pwdInput = $('pwdInput');
+  const btnLogin = $('btnLogin');
+  const pwdError = $('pwdError');
+  const mainContent = $('mainContent');
+  const tokenInput = $('ghTokenInput');
+  const btnSaveToken = $('btnSaveToken');
+  const ghStatus = $('ghStatus');
+  const fileInput = $('fileInput');
+  const fileDropZone = $('fileDropZone');
+  const fileInfo = $('fileInfo');
+  const fileName = $('fileName');
+  const rowCount = $('rowCount');
+  const fileStatus = $('fileStatus');
+  const btnClearFile = $('btnClearFile');
+  const selectBarcodeCol = $('selectBarcodeCol');
+  const selectNameCol = $('selectNameCol');
+  const selectCodeCol = $('selectCodeCol');
+  const previewTable = $('previewTable');
+  const publishCount = $('publishCount');
+  const versionInput = $('versionInput');
+  const btnPublish = $('btnPublish');
+  const publishProgress = $('publishProgress');
+  const progressText = $('progressText');
+  const publishStatus = $('publishStatus');
+  const historyList = $('historyList');
+
+  let rawData = [];       // parsed rows from Excel
+  let allColumns = [];    // column names
+  let token = '';
+
+  // ===== Password =====
+  function doLogin() {
+    if (pwdInput.value === PWD) {
+      pwdError.classList.add('hidden');
+      mainContent.classList.remove('hidden');
+      pwdInput.value = '';
+      $('passwordGate').classList.add('hidden');
+      loadToken();
+      renderHistory();
+    } else {
+      pwdError.classList.remove('hidden');
+    }
+  }
+  btnLogin.addEventListener('click', doLogin);
+  pwdInput.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+  // ===== Token =====
+  function loadToken() {
+    const saved = localStorage.getItem(LS_TOKEN);
+    if (saved) {
+      token = saved;
+      tokenInput.value = '••••••••' + saved.slice(-6);
+      checkToken();
+    }
+  }
+  btnSaveToken.addEventListener('click', () => {
+    const val = tokenInput.value.trim();
+    if (!val || val.startsWith('••••')) return;
+    token = val;
+    localStorage.setItem(LS_TOKEN, val);
+    tokenInput.value = '••••••••' + val.slice(-6);
+    checkToken();
+  });
+
+  async function checkToken() {
+    if (!token) { ghStatus.textContent = '未配置'; ghStatus.className = 'tag bg-gray-100 text-gray-400 text-xs ml-auto'; return; }
+    try {
+      const resp = await fetch('https://api.github.com/user', {
+        headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json', 'User-Agent': 'store-mgmt' }
+      });
+      if (resp.ok) {
+        const user = await resp.json();
+        ghStatus.textContent = '✅ ' + user.login;
+        ghStatus.className = 'tag bg-green-50 text-green-600 text-xs ml-auto';
+      } else {
+        ghStatus.textContent = '❌ 无效';
+        ghStatus.className = 'tag bg-red-50 text-red-500 text-xs ml-auto';
+      }
+    } catch(e) {
+      ghStatus.textContent = '❌ 连接失败';
+      ghStatus.className = 'tag bg-red-50 text-red-500 text-xs ml-auto';
+    }
+  }
+
+  // ===== File Upload =====
+  fileDropZone.addEventListener('click', () => fileInput.click());
+  fileDropZone.addEventListener('dragover', e => { e.preventDefault(); fileDropZone.classList.add('dragover'); });
+  fileDropZone.addEventListener('dragleave', () => fileDropZone.classList.remove('dragover'));
+  fileDropZone.addEventListener('drop', e => { e.preventDefault(); fileDropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+  function handleFile(file) {
+    if (!file.name.match(/\.xlsx?$/i) && !file.name.match(/\.csv$/i)) { alert('请选择 .xlsx / .xls / .csv 文件'); return; }
+    fileName.textContent = file.name;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        if (!json.length) { alert('文件为空'); return; }
+        rawData = json;
+        allColumns = Object.keys(json[0]);
+        fileInfo.classList.remove('hidden');
+        fileStatus.textContent = '✅ ' + json.length + ' 条';
+        fileStatus.className = 'tag bg-green-50 text-green-600 text-xs ml-auto';
+        rowCount.textContent = json.length.toLocaleString();
+        populateColumns();
+        autoDetectColumns();
+        renderPreview();
+        updatePublishBtn();
+      } catch(err) {
+        alert('读取文件失败: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  btnClearFile.addEventListener('click', () => {
+    rawData = []; allColumns = [];
+    fileInfo.classList.add('hidden');
+    fileStatus.textContent = '未上传';
+    fileStatus.className = 'tag bg-gray-100 text-gray-400 text-xs ml-auto';
+    selectBarcodeCol.innerHTML = '';
+    selectNameCol.innerHTML = '';
+    selectCodeCol.innerHTML = '<option value="">（不选）</option>';
+    previewTable.innerHTML = '<div class="text-center text-gray-400 text-sm py-8">请先上传 Excel 文件</div>';
+    fileInput.value = '';
+    updatePublishBtn();
+  });
+
+  function populateColumns() {
+    selectBarcodeCol.innerHTML = allColumns.map(c => '<option value="'+c.replace(/"/g,'&quot;')+'">'+esc(c)+'</option>').join('');
+    selectNameCol.innerHTML = allColumns.map(c => '<option value="'+c.replace(/"/g,'&quot;')+'">'+esc(c)+'</option>').join('');
+    selectCodeCol.innerHTML = '<option value="">（不选）</option>'+allColumns.map(c => '<option value="'+c.replace(/"/g,'&quot;')+'">'+esc(c)+'</option>').join('');
+  }
+
+  function autoDetectColumns() {
+    const barcodeKeywords = ['条形码','条码','商品条码','国际条码','barcode','条码号'];
+    const nameKeywords = ['商品名称','商品名','名称','品名','name','货品名称','产品名称'];
+    const codeKeywords = ['商品编码','编码','货号','sku','商品编号','物料编码'];
+    let barcodeCol = '';
+    let nameCol = '';
+    let codeCol = '';
+    for (const kw of barcodeKeywords) {
+      const found = allColumns.find(c => c.includes(kw));
+      if (found) { barcodeCol = found; break; }
+    }
+    for (const kw of nameKeywords) {
+      const found = allColumns.find(c => c.includes(kw));
+      if (found) { nameCol = found; break; }
+    }
+    for (const kw of codeKeywords) {
+      const found = allColumns.find(c => c.includes(kw));
+      if (found) { codeCol = found; break; }
+    }
+    if (barcodeCol) selectBarcodeCol.value = barcodeCol;
+    if (nameCol) selectNameCol.value = nameCol;
+    if (codeCol) selectCodeCol.value = codeCol;
+  }
+
+  selectBarcodeCol.addEventListener('change', renderPreview);
+  selectNameCol.addEventListener('change', renderPreview);
+  selectCodeCol.addEventListener('change', renderPreview);
+
+  function renderPreview() {
+    const bc = selectBarcodeCol.value;
+    const nc = selectNameCol.value;
+    const cc = selectCodeCol.value;
+    if (!bc || !nc || !rawData.length) {
+      previewTable.innerHTML = '<div class="text-center text-gray-400 text-sm py-8">请选择列映射</div>';
+      return;
+    }
+    // 计算处理后最终条数
+    const previewCount = countProcessedItems();
+    const preview = rawData.slice(0, 30);
+    let html = '<table><thead><tr><th>#</th><th>'+esc(bc)+'</th><th>'+esc(nc)+'</th>'+(cc?'<th>'+esc(cc)+'</th>':'')+'</tr></thead><tbody>';
+    preview.forEach((row, i) => {
+      const bcVal = String(row[bc] || '').trim();
+      html += '<tr><td style="color:#9CA3AF;width:36px;">'+(i+1)+'</td><td class="font-mono text-xs">'+esc(bcVal)+'</td><td>'+esc(String(row[nc] || ''))+'</td>'+(cc?'<td class="font-mono text-xs text-gray-500">'+esc(String(row[cc] || ''))+'</td>':'')+'</tr>';
+    });
+    if (rawData.length > 30) html += '<tr><td colspan="'+(cc?4:3)+'" style="text-align:center;color:#9CA3AF;padding:10px;">... 共 ' + rawData.length.toLocaleString() + ' 条原始数据，处理后将生成 ' + previewCount.toLocaleString() + ' 条</td></tr>';
+    html += '</tbody></table>';
+    previewTable.innerHTML = html;
+    updatePublishBtn();
+  }
+
+  // ===== Publish =====
+  function countProcessedItems() {
+    const bc = selectBarcodeCol.value;
+    const nc = selectNameCol.value;
+    const cc = selectCodeCol.value;
+    if (!bc || !nc || !rawData.length) return 0;
+    let count = 0;
+    rawData.forEach(row => {
+      let codes = String(row[bc] || '').trim();
+      if (!codes) return;
+      // 多条码拆分
+      const parts = codes.split(/[,，、;；\s]+/).filter(Boolean);
+      parts.forEach(code => {
+        if (code && !/ZB$/i.test(code)) count++;
+      });
+    });
+    return count;
+  }
+  function updatePublishBtn() {
+    const hasData = rawData.length > 0 && selectBarcodeCol.value && selectNameCol.value;
+    btnPublish.disabled = !hasData || !token;
+    const processed = hasData ? countProcessedItems() : 0;
+    publishCount.textContent = processed > 0 ? processed.toLocaleString() + ' 条' : '0 条';
+  }
+
+  // Listen for token changes to update button
+  tokenInput.addEventListener('input', () => {
+    if (!tokenInput.value.startsWith('••••')) updatePublishBtn();
+  });
+
+  btnPublish.addEventListener('click', doPublish);
+
+  async function doPublish() {
+    if (!token) { alert('请先配置 GitHub Token'); return; }
+    if (!rawData.length) { alert('请先上传 Excel 文件'); return; }
+    const bc = selectBarcodeCol.value;
+    const nc = selectNameCol.value;
+    const cc = selectCodeCol.value;
+    if (!bc || !nc) { alert('请选择条码列和商品名列'); return; }
+
+    btnPublish.disabled = true;
+    publishProgress.classList.remove('hidden');
+    progressText.textContent = '正在处理数据...';
+    publishStatus.textContent = '发布中...';
+    publishStatus.className = 'tag bg-amber-50 text-amber-600 text-xs ml-auto pulse';
+
+    try {
+      // 1. Build desensitized data with code, filter ZB, split multi-barcodes
+      const items = [];
+      rawData.forEach(function(row) {
+        var codes = String(row[bc] || '').trim();
+        var name = String(row[nc] || '').trim();
+        var code = cc ? String(row[cc] || '').trim() : '';
+        if (!codes || !name) return;
+        // 多条码拆分：支持逗号、分号、空格、顿号
+        var parts = codes.split(/[,，、;；\\s]+/).filter(Boolean);
+        parts.forEach(function(b) {
+          // 过滤 ZB 结尾（不区分大小写）
+          if (/ZB$/i.test(b)) return;
+          items.push({ b: b, n: name, c: code });
+        });
+      });
+
+      if (!items.length) { throw new Error('没有有效的商品数据（所有条码可能都被 ZB 过滤了）'); }
+
+      const version = versionInput.value.trim() || new Date().toISOString().slice(0, 10) + ' v' + Date.now().toString(36);
+      const payload = { v: version, c: items.length, items };
+
+      // 2. AES Encrypt
+      const jsonStr = JSON.stringify(payload);
+      const encrypted = CryptoJS.AES.encrypt(jsonStr, SECRET_KEY).toString();
+
+      // 3. Encode for GitHub API
+      const content = btoa(encrypted);
+
+      progressText.textContent = '正在上传到 GitHub...';
+
+      // 4. Get existing file SHA if any
+      let sha = null;
+      try {
+        const getResp = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`, {
+          headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json', 'User-Agent': 'store-mgmt' }
+        });
+        if (getResp.ok) {
+          const existing = await getResp.json();
+          sha = existing.sha;
+        }
+      } catch(e) {}
+
+      // 5. Upload
+      const body = {
+        message: 'Update products data - ' + version,
+        content: content
+      };
+      if (sha) body.sha = sha;
+
+      const putResp = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`, {
+        method: 'PUT',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github+json', 'User-Agent': 'store-mgmt' },
+        body: JSON.stringify(body)
+      });
+
+      if (!putResp.ok) {
+        const err = await putResp.json();
+        throw new Error('GitHub API 错误: ' + (err.message || putResp.statusText));
+      }
+
+      const result = await putResp.json();
+
+      // 6. Record publish history
+      addHistory(version, items.length);
+
+      progressText.textContent = '✅ 发布成功！';
+      publishStatus.textContent = '✅ 已发布';
+      publishStatus.className = 'tag bg-green-50 text-green-600 text-xs ml-auto';
+
+      setTimeout(() => {
+        publishProgress.classList.add('hidden');
+        btnPublish.disabled = false;
+      }, 2000);
+
+      toast('✅ 成功发布 ' + items.length.toLocaleString() + ' 条商品数据！', 'success');
+
+    } catch(err) {
+      progressText.textContent = '❌ 发布失败: ' + err.message;
+      publishStatus.textContent = '❌ 失败';
+      publishStatus.className = 'tag bg-red-50 text-red-500 text-xs ml-auto';
+      setTimeout(() => {
+        publishProgress.classList.add('hidden');
+        btnPublish.disabled = false;
+      }, 3000);
+      toast('❌ 发布失败: ' + err.message, 'error');
+    }
+  }
+
+  // ===== History =====
+  function addHistory(version, count) {
+    const records = JSON.parse(localStorage.getItem(LS_HISTORY) || '[]');
+    records.unshift({
+      version: version,
+      count: count,
+      time: new Date().toLocaleString('zh-CN'),
+      ts: Date.now()
+    });
+    if (records.length > 20) records.pop();
+    localStorage.setItem(LS_HISTORY, JSON.stringify(records));
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const records = JSON.parse(localStorage.getItem(LS_HISTORY) || '[]');
+    if (!records.length) {
+      historyList.innerHTML = '<p class="text-center text-gray-400 text-sm py-4">暂无发布记录</p>';
+      return;
+    }
+    let html = '';
+    records.forEach((r, i) => {
+      html += '<div class="flex items-center justify-between py-2 border-b border-gray-100 text-sm last:border-0">' +
+        '<div><span class="text-gray-500">' + r.time + '</span></div>' +
+        '<div class="text-right"><span class="font-medium text-gray-700">' + r.count.toLocaleString() + ' 条</span></div>' +
+        '</div>';
+    });
+    historyList.innerHTML = html;
+  }
+
+  // ===== Utilities =====
+  function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+  function toast(msg, type) {
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:10px;color:white;font-size:14px;font-weight:500;z-index:999;transition:opacity 0.3s;max-width:90%;text-align:center;' +
+      (type === 'success' ? 'background:#059669;' : 'background:#DC2626;');
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3000);
+  }
+
+})();
+</script>
+</body>
+</html>
