@@ -1212,22 +1212,25 @@
         merges.push({s:{r:startRow,c:10}, e:{r:endRow,c:10}}); // 总计 K 列
       }
     });
+    const csvHeader = h.join(',');
+    const csvRows = [];
+    Object.keys(groups).forEach(orderNo => {
+      const items = groups[orderNo].sort((a, b) => (a.boxNo||1) - (b.boxNo||1));
+      const first = items[0];
+      const totalQty = items.reduce((s, r) => s + (parseInt(r.quantity) || 0), 0);
+      items.forEach(r => {
+        csvRows.push([
+          orderNo, first.fromStore||'', first.toStore||'', exportTime,
+          first.transferType||'调拨出库', first.inboundNo||'', first.note||'',
+          r.barcode||'', r.productName||'', parseInt(r.quantity)||0,
+          totalQty, (first.fromStore||'')+'正常仓', '第'+(r.boxNo||1)+'箱'
+        ].map(v => '"'+String(v).replace(/"/g,'""')+'"').join(','));
+      });
+    });
+    const csv = '\uFEFF' + csvHeader + '\n' + csvRows.join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const file = new File([blob], filename+'.csv', {type:'text/csv;charset=utf-8'});
 
-    // 创建 XLSX workbook
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    ws['!merges'] = merges;
-    // 设置列宽
-    ws['!cols'] = [
-              {wch:22},{wch:18},{wch:18},{wch:20},{wch:12},{wch:18},{wch:16},
-      {wch:16},{wch:30},{wch:10},{wch:8},{wch:22},{wch:8}
-    ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '调拨单');
-    const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
-    const blob = new Blob([wbout], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-    const file = new File([blob], filename+'.xlsx', {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-
-    // 【分享】尝试系统分享（钉钉可能不支持文件，微信正常）
     if (navigator.share && navigator.canShare && navigator.canShare({files: [file]})) {
       navigator.share({ files: [file], title: '门店调拨单' })
         .then(() => toast('已分享', 'success'))
