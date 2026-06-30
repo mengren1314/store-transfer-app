@@ -256,6 +256,7 @@
   </style>
   <script src="quagga.min.js"></script>
   <script src="xlsx.core.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
 </head>
 <body>
 <div class="phone-frame">
@@ -329,6 +330,7 @@
         <div>
           <span style="font-size:13px;font-weight:600;color:#374151;">📊 商品库</span>
           <span id="productCountBadge" style="font-size:11px;color:#9CA3AF;margin-left:6px;"></span>
+          <span id="remoteStatus" style="font-size:10px;color:#059669;margin-left:6px;"></span>
         </div>
         <div style="display:flex;gap:6px;">
           <button id="btnClearFromScan" class="btn btn-sm btn-outline" style="gap:4px;color:#EF4444;border-color:#EF4444;font-size:12px;padding:6px 10px;width:auto;">🗑 清空</button>
@@ -383,6 +385,7 @@
       </div>
       <div class="mb-2"><label>条码</label><div id="scanBarcode" class="text-sm font-mono" style="font-weight:500;">-</div></div>
       <div class="mb-2"><label>商品名称</label><div id="scanProductName" style="font-size:15px;font-weight:600;">-</div></div>
+      <div id="scanCodeRow" class="mb-2 hidden"><label>商品编码</label><div id="scanProductCode" class="text-sm font-mono" style="color:#6B7280;">-</div></div>
       <div class="mb-2"><label>箱号</label><div id="scanBoxNo" style="font-size:15px;font-weight:600;color:#4F46E5;">第 1 箱</div></div>
       <div class="mb-2"><label>数量</label><input id="inputQuantity" type="number" min="1" step="1" class="input" placeholder="输入数量后自动提交" /></div>
     </div>
@@ -592,7 +595,7 @@
 </div>
 
 <script>
-(function() {
+(async function() {
   'use strict';
 
   // ===== 存储 =====
@@ -611,6 +614,13 @@
   let useBackCamera = true;
   let currentBoxNo = 1;
   let maxCreatedBoxNo = 1;
+
+  // ===== 远程商品库同步 =====
+  const SECRET_KEY = 'KkV_Tr@nsf3r#2026!';
+  const REMOTE_DATA_URL = 'https://raw.githubusercontent.com/CodeVoyage3/config-bootstrap/main/products.bin';
+  const LS_REMOTE_CACHE = 'st_remote_cache';
+  let remoteProductMap = new Map();
+  let remoteVersion = '';
 
   function trySave(key, data) {
     try {
@@ -649,6 +659,38 @@
     let t = tryLoad(KEY_TRANSFERS);
     products = p || [];
     transfers = t || [];
+  }
+  // 从远程拉取加密的商品数据
+  async function fetchRemoteProducts() {
+    let encrypted = null;
+    try {
+      const resp = await fetch(REMOTE_DATA_URL);
+      if (resp.ok) {
+        encrypted = await resp.text();
+        if (encrypted && encrypted.length > 50) {
+          localStorage.setItem(LS_REMOTE_CACHE, encrypted);
+        }
+      }
+    } catch(e) {}
+    if (!encrypted) {
+      encrypted = localStorage.getItem(LS_REMOTE_CACHE);
+    }
+    if (!encrypted) return;
+    try {
+      const bytes = CryptoJS.AES.decrypt(encrypted, SECRET_KEY);
+      const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+      if (!decrypted) return;
+      const data = JSON.parse(decrypted);
+      if (data && data.items && data.items.length) {
+        remoteProductMap = new Map();
+        data.items.forEach(function(item) {
+          if (item.b) remoteProductMap.set(item.b, { n: item.n || '', c: item.c || '' });
+        });
+        remoteVersion = data.v || '';
+        var el = document.getElementById('remoteStatus');
+        if (el) el.textContent = '📦 ' + remoteProductMap.size + ' 条 已同步';
+      }
+    } catch(e) {}
   }
   // 超过15天未打开则自动清空数据
   function checkExpiration() {
@@ -974,13 +1016,20 @@
     // 关闭全屏相机覆盖层（但不停止摄像头流，实现一次性授权）
     document.getElementById('scannerOverlay').classList.remove('open');
 
-    const matched = products.find(p => p.barcode === code);
+    var remoteMatch = remoteProductMap.get(code);
+    const matched = products.find(p => p.barcode === code) || (remoteMatch ? { barcode: code, name: remoteMatch.n, code: remoteMatch.c } : null);
     currentScan = { barcode: code, product: matched || null };
 
     const r = document.getElementById('scanResult');
     r.classList.remove('hidden');
     document.getElementById('scanBarcode').textContent = code;
     document.getElementById('scanProductName').textContent = matched ? matched.name : '未查到商品信息';
+    if (matched && matched.code) {
+      document.getElementById('scanProductCode').textContent = matched.code;
+      document.getElementById('scanCodeRow').classList.remove('hidden');
+    } else {
+      document.getElementById('scanCodeRow').classList.add('hidden');
+    }
     document.getElementById('scanBoxNo').textContent = '第 ' + currentBoxNo + ' 箱';
     setTimeout(() => document.getElementById('inputQuantity').focus(), 300);
   }
@@ -1370,6 +1419,7 @@
   // ===== Init =====
   loadData();
   checkExpiration();
+  await fetchRemoteProducts();
   renderProducts();
   renderRecords();
   renderLatestRecords();
@@ -1990,7 +2040,8 @@
   document.getElementById('btnManualMatch').addEventListener('click', () => {
     const code = document.getElementById('manualBarcode').value.trim();
     if (!code) { toast('请输入条码', 'error'); return; }
-    const matched = products.find(p => p.barcode === code);
+    var remoteMatch = remoteProductMap.get(code);
+    const matched = products.find(p => p.barcode === code) || (remoteMatch ? { barcode: code, name: remoteMatch.n, code: remoteMatch.c } : null);
     currentScan = { barcode: code, product: matched || null };
 
     document.getElementById('scanResult').classList.remove('hidden');
@@ -1998,8 +2049,15 @@
 
     if (matched) {
       document.getElementById('scanProductName').textContent = matched.name;
+      if (matched.code) {
+        document.getElementById('scanProductCode').textContent = matched.code;
+        document.getElementById('scanCodeRow').classList.remove('hidden');
+      } else {
+        document.getElementById('scanCodeRow').classList.add('hidden');
+      }
     } else {
       document.getElementById('scanProductName').textContent = '未查到商品信息';
+      document.getElementById('scanCodeRow').classList.add('hidden');
       toast('⚠️ 该条码未匹配到商品，请先在商品库添加', '');
     }
     document.getElementById('scanBoxNo').textContent = '第 ' + currentBoxNo + ' 箱';
